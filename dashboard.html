@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAVNI - Cognitive Wellness Monitor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        :root {
+            --primary-bg: #0f1419;
+            --secondary-bg: #1a1f2e;
+            --accent-bg: #252b3a;
+            --border-color: #3d4855;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0a6;
+            --text-muted: #5f6368;
+            --accent-blue: #4285f4;
+            --accent-orange: #ff9800;
+            --accent-red: #ea4335;
+            --accent-yellow: #fbbc04;
+            --success-color: #34a853;
+            --warning-color: #ff9800;
+            --error-color: #ea4335;
+            --info-color: #4285f4;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .dashboard {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: var(--secondary-bg);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            min-height: 80px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(45deg, var(--accent-blue), var(--info-color));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 18px;
+        }
+
+        .system-title {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .system-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .system-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .mission-time {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--accent-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .met-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .met-display {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-blue);
+            font-family: 'Courier New', monospace;
+        }
+
+        .video-feed {
+            width: 200px;
+            height: 150px;
+            background: var(--secondary-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .video-feed img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+            padding: 8px;
+            color: var(--text-primary);
+            font-size: 10px;
+            font-weight: 500;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .video-status {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 8px;
+            height: 8px;
+            background: var(--error-color);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .video-status.active {
+            background: var(--success-color);
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            background: var(--accent-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--error-color);
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: var(--success-color);
+        }
+
+        .status-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: var(--secondary-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .crew-member {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--accent-bg);
+            border: 1px solid transparent;
+        }
+
+        .crew-member:hover {
+            border-color: var(--accent-blue);
+            background: rgba(66, 133, 244, 0.1);
+        }
+
+        .crew-member.selected {
+            border-color: var(--accent-blue);
+            background: rgba(66, 133, 244, 0.15);
+        }
+
+        .crew-id {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .crew-name {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin: 4px 0;
+        }
+
+        .crew-status {
+            font-size: 11px;
+            color: var(--success-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .metric-card {
+            background: var(--accent-bg);
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .metric-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .metric-value.low { color: var(--success-color); }
+        .metric-value.moderate { color: var(--warning-color); }
+        .metric-value.high { color: var(--error-color); }
+
+        .main-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .dashboard-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .charts-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .chart-container {
+            background: var(--secondary-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chart-subtitle {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .primary-chart {
+            height: 340px;
+        }
+
+        .secondary-charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .secondary-chart {
+            height: 240px;
+        }
+
+        .chart-canvas-wrapper {
+            position: relative;
+            height: calc(100% - 50px);
+            width: 100%;
+        }
+
+        .metrics-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .cwi-gauge-container {
+            background: var(--secondary-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            text-align: center;
+        }
+
+        .gauge-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+        }
+
+        .gauge {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            margin: 0 auto 20px;
+        }
+
+        .gauge-bg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .gauge-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .gauge-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .gauge-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        .detailed-metrics {
+            background: var(--secondary-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+        }
+
+        .metrics-section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(61, 72, 85, 0.3);
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .metric-name {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .metric-data {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .system-log-container {
+            background: var(--secondary-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-header {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
+        .log-content {
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.4;
+            color: var(--text-secondary);
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 2px 0;
+        }
+
+        .log-entry.info { color: var(--info-color); }
+        .log-entry.success { color: var(--success-color); }
+        .log-entry.warning { color: var(--warning-color); }
+        .log-entry.error { color: var(--error-color); }
+
+        .connection-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 20, 25, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .connection-overlay.hidden {
+            display: none;
+        }
+
+        .connection-message {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .connection-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--accent-bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        .cwi-excellent { color: var(--success-color) !important; }
+        .cwi-good { color: #7cb342 !important; }
+        .cwi-fair { color: var(--warning-color) !important; }
+        .cwi-poor { color: #ff5722 !important; }
+        .cwi-critical { color: var(--error-color) !important; }
+    </style>
+</head>
+<body>
+    <!-- Connection Overlay -->
+    <div class="connection-overlay" id="connection-overlay">
+        <div class="connection-message">
+            <div class="connection-spinner"></div>
+            <h3>Connecting to MAVNI Backend</h3>
+            <p id="connection-status-text">Establishing connection...</p>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo-section">
+                    <div class="logo">M</div>
+                    <div class="system-title">
+                        <div class="system-name">MAVNI System</div>
+                        <div class="system-subtitle">Cognitive Wellness Monitor</div>
+                    </div>
+                </div>
+                
+                <div class="mission-time">
+                    <div class="met-label">Mission Elapsed Time</div>
+                    <div class="met-display" id="met-display">DAY 00:00:00:00</div>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <!-- <div class="video-feed">
+                    <div class="video-status" id="video-status"></div>
+                    <img id="video-stream" alt="Crew Member Feed" style="display: none;">
+                    <div class="video-overlay">CREW-001 FEED</div>
+                </div> -->
+
+                <div class="connection-status">
+                    <div class="status-indicator" id="status-indicator"></div>
+                    <div>
+                        <div class="status-text" id="status-text">OFFLINE</div>
+                        <div class="status-label">System Status</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <div class="section-title">Crew Selection</div>
+                    <div class="crew-member selected" data-crew="CREW-001">
+                        <div class="crew-id">CREW-001</div>
+                        <div class="crew-name">Commander Singh</div>
+                        <div class="crew-status">Active</div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-title">Quick Metrics</div>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Stress</div>
+                            <div class="metric-value low" id="sidebar-stress">--%</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Fatigue</div>
+                            <div class="metric-value low" id="sidebar-fatigue">--%</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Blinks/Min</div>
+                            <div class="metric-value" id="sidebar-blinks">--</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Emotion</div>
+                            <div class="metric-value" id="sidebar-emotion">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-title">System Log</div>
+                    <div class="log-content" id="sidebar-log"></div>
+                </div>
+            </aside>
+
+            <!-- Main Panel -->
+            <main class="main-panel">
+                <div class="dashboard-grid">
+                    <!-- Charts Section -->
+                    <div class="charts-section">
+                        <div class="chart-container primary-chart">
+                            <div class="chart-header">
+                                <div>
+                                    <div class="chart-title">Cognitive Wellness Index (CWI)</div>
+                                    <div class="chart-subtitle">Real-time wellness scoring based on multimodal analysis</div>
+                                </div>
+                            </div>
+                            <div class="chart-canvas-wrapper">
+                                <canvas id="cwiChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="secondary-charts">
+                            <div class="chart-container secondary-chart">
+                                <div class="chart-header">
+                                    <div>
+                                        <div class="chart-title">Stress Level</div>
+                                        <div class="chart-subtitle">Emotion + Vocal Analysis</div>
+                                    </div>
+                                </div>
+                                <div class="chart-canvas-wrapper">
+                                    <canvas id="stressChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-container secondary-chart">
+                                <div class="chart-header">
+                                    <div>
+                                        <div class="chart-title">Fatigue Level</div>
+                                        <div class="chart-subtitle">Blink Rate + Eye Closure</div>
+                                    </div>
+                                </div>
+                                <div class="chart-canvas-wrapper">
+                                    <canvas id="fatigueChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Panel -->
+                    <div class="metrics-panel">
+                        <div class="cwi-gauge-container">
+                            <div class="gauge-title">Current Wellness Score</div>
+                            <div class="gauge">
+                                <svg class="gauge-bg" viewBox="0 0 200 200">
+                                    <circle cx="100" cy="100" r="80" fill="none" stroke="var(--accent-bg)" stroke-width="12"/>
+                                    <circle id="gauge-progress" cx="100" cy="100" r="80" fill="none" stroke="var(--accent-blue)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 502.4" transform="rotate(-90 100 100)" style="transition: stroke-dasharray 0.5s ease"/>
+                                </svg>
+                                <div class="gauge-value">
+                                    <div class="gauge-number" id="cwi-percentage">--%</div>
+                                    <div class="gauge-label">CWI Score</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="detailed-metrics">
+                            <div class="metrics-section-title">Physiological Factors</div>
+                            <div class="metric-row">
+                                <span class="metric-name">Primary Emotion</span>
+                                <span class="metric-data" id="detail-emotion">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-name">Blink Rate</span>
+                                <span class="metric-data" id="detail-blinks">-- bpm</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-name">Vocal Anomaly</span>
+                                <span class="metric-data" id="detail-anomaly">--%</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-name">Vocal Energy</span>
+                                <span class="metric-data" id="detail-energy">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-name">Vocal Pitch</span>
+                                <span class="metric-data" id="detail-pitch">-- Hz</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-name">Fatigue Level</span>
+                                <span class="metric-data" id="detail-fatigue-level">--</span>
+                            </div>
+                        </div>
+
+                        <div class="system-log-container">
+                            <div class="log-header">Activity Log</div>
+                            <div class="log-content" id="main-log"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const BACKEND_URL = "http://127.0.0.1:8000";
+        const CHART_HISTORY_SECONDS = 60;
+        const CHART_UPDATE_INTERVAL_MS = 1000;
+        const MAX_LOG_ENTRIES = 50;
+
+        // --- Global State ---
+        let socket = null;
+        let missionStartTime = Date.now();
+        let cwiChart, stressChart, fatigueChart;
+        let lastDataUpdate = null;
+        let dataBuffer = []; // Buffer for collecting data
+
+        // --- Chart Data ---
+        let timeLabels = [];
+        let cwiData = [];
+        let stressData = [];
+        let fatigueData = [];
+
+        // Initialize arrays with empty data
+        function initializeChartData() {
+            const now = Date.now();
+            timeLabels = [];
+            cwiData = [];
+            stressData = [];
+            fatigueData = [];
+            
+            // Fill with null values for the past 60 seconds
+            for (let i = CHART_HISTORY_SECONDS - 1; i >= 0; i--) {
+                const time = new Date(now - (i * 1000));
+                timeLabels.push(time.toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit' 
+                }));
+                cwiData.push(null);
+                stressData.push(null);
+                fatigueData.push(null);
+            }
+        }
+
+        // --- Page Load Initializer ---
+        window.addEventListener('load', initializeApp);
+
+        function initializeApp() {
+            initializeChartData();
+            createCharts();
+            startTimers();
+            connectToBackend();
+            logMessage('Dashboard initialized.', 'info');
+        }
+
+        // --- Backend Connection ---
+        function connectToBackend() {
+            if (socket) socket.disconnect();
+            
+            updateConnectionStatus(false, 'Connecting...');
+            showConnectionOverlay('Connecting to MAVNI Backend...');
+
+            socket = io(BACKEND_URL, {
+                transports: ['websocket'],
+                reconnection: true,
+                reconnectionAttempts: Infinity,
+                reconnectionDelay: 3000,
+            });
+
+            socket.on("connect", () => {
+                updateConnectionStatus(true, 'ONLINE');
+                hideConnectionOverlay();
+                logMessage('Backend connection established.', 'success');
+            });
+
+            socket.on("disconnect", (reason) => {
+                updateConnectionStatus(false, 'OFFLINE');
+                showConnectionOverlay('Connection lost. Reconnecting...');
+                logMessage(`Connection lost: ${reason}`, 'error');
+            });
+            
+            socket.on("connect_error", (error) => {
+                logMessage('Backend connection failed.', 'error');
+                updateConnectionStatus(false, 'ERROR');
+                showConnectionOverlay('Connection Failed. Check server.');
+            });
+
+            socket.on("update_data", (data) => {
+                if (data && typeof data === 'object') {
+                    console.log('Received data:', data); // Debug log
+                    lastDataUpdate = data;
+                    updateUI(data);
+                    logDataUpdate(data);
+                }
+            });
+        }
+
+        // --- UI Update Functions ---
+        function updateUI(data) {
+            updateMetricsDisplay(data);
+            updateVideoFeed(data.raw_data);
+        }
+        
+        function updateMetricsDisplay(data) {
+            console.log('Updating metrics with:', data); // Debug log
+            
+            // CWI Gauge with dynamic coloring
+            const cwi = data.cognitive_wellness_index || 0;
+            updateCWIGauge(cwi);
+
+            // Sidebar & Detail Metrics
+            updateMetric('sidebar-stress', `${data.stress_level || 0}%`, getStatusClass(data.stress_level));
+            updateMetric('sidebar-fatigue', `${data.fatigue_level || 0}%`, getStatusClass(data.fatigue_level));
+            updateMetric('sidebar-blinks', data.factors?.blink_rate || '--');
+            updateMetric('sidebar-emotion', data.factors?.emotion || '--');
+            
+            // Enhanced detail metrics
+            updateMetric('detail-emotion', data.factors?.emotion || '--');
+            updateMetric('detail-blinks', `${data.factors?.blink_rate || '--'} bpm`);
+            
+            const anomalyScore = (data.factors?.vocal_anomaly_factor || 0) * 100;
+            updateMetric('detail-anomaly', `${anomalyScore.toFixed(1)}%`);
+            
+            // Additional VANI metrics
+            if (data.raw_data) {
+                const energy = data.raw_data.vocal_energy || 0;
+                const pitch = data.raw_data.vocal_pitch || 0;
+                const fatigueLevel = data.raw_data.fatigue_level || 'Low';
+                
+                updateMetric('detail-energy', energy > 0 ? energy.toFixed(4) : '--');
+                updateMetric('detail-pitch', pitch > 0 ? `${pitch.toFixed(1)} Hz` : '--');
+                updateMetric('detail-fatigue-level', fatigueLevel);
+            }
+        }
+
+        function updateCWIGauge(cwi) {
+            // Update gauge visual
+            document.getElementById('cwi-percentage').textContent = `${cwi}%`;
+            const circumference = 2 * Math.PI * 80;
+            const progress = (cwi / 100) * circumference;
+            const gaugeElement = document.getElementById('gauge-progress');
+            gaugeElement.style.strokeDasharray = `${progress} ${circumference}`;
+            
+            // Update gauge color based on CWI level
+            const gaugeNumber = document.getElementById('cwi-percentage');
+            gaugeNumber.className = 'gauge-number ' + getCWIColorClass(cwi);
+            
+            if (cwi >= 80) {
+                gaugeElement.style.stroke = 'var(--success-color)';
+            } else if (cwi >= 60) {
+                gaugeElement.style.stroke = '#7cb342';
+            } else if (cwi >= 40) {
+                gaugeElement.style.stroke = 'var(--warning-color)';
+            } else if (cwi >= 20) {
+                gaugeElement.style.stroke = '#ff5722';
+            } else {
+                gaugeElement.style.stroke = 'var(--error-color)';
+            }
+        }
+
+        function updateVideoFeed(raw_data) {
+            if (raw_data?.video_frame) {
+                const videoElement = document.getElementById('video-stream');
+                videoElement.src = 'data:image/jpeg;base64,' + raw_data.video_frame;
+                videoElement.style.display = 'block';
+                document.getElementById('video-status').classList.add('active');
+            } else {
+                document.getElementById('video-status').classList.remove('active');
+            }
+        }
+
+        function logDataUpdate(data) {
+            const cwi = data.cognitive_wellness_index;
+            const stress = data.stress_level;
+            const fatigue = data.fatigue_level;
+            const emotion = data.factors?.emotion || 'Unknown';
+            const anomaly = (data.factors?.vocal_anomaly_factor || 0) * 100;
+            
+            // Log significant changes or alerts
+            if (stress > 70) {
+                logMessage(`HIGH STRESS ALERT: ${stress}% (Emotion: ${emotion}, Anomaly: ${anomaly.toFixed(1)}%)`, 'error');
+            } else if (fatigue > 70) {
+                logMessage(`HIGH FATIGUE ALERT: ${fatigue}% (Blinks: ${data.factors?.blink_rate || 'N/A'} bpm)`, 'error');
+            } else if (cwi < 30) {
+                logMessage(`LOW CWI WARNING: ${cwi}% (Critical wellness level)`, 'warning');
+            }
+        }
+
+        // --- Chart Creation & Updates ---
+        function createCharts() {
+            const baseOptions = {
+                responsive: true, 
+                maintainAspectRatio: false, 
+                animation: { duration: 0 }, // Disable animations for smooth real-time updates
+                layout: {
+                    padding: {
+                        left: 10,
+                        right: 10,
+                        top: 10,
+                        bottom: 10
+                    }
+                },
+                plugins: { 
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { 
+                        type: 'category',
+                        ticks: { 
+                            color: '#9aa0a6', 
+                            maxTicksLimit: 8,
+                            maxRotation: 0,
+                            font: { size: 10 }
+                        }, 
+                        grid: { 
+                            color: 'rgba(61, 72, 85, 0.3)',
+                            drawBorder: false
+                        }
+                    },
+                    y: { 
+                        min: 0, 
+                        max: 100,
+                        ticks: { 
+                            color: '#9aa0a6', 
+                            callback: v => `${v}%`,
+                            stepSize: 25,
+                            font: { size: 10 }
+                        }, 
+                        grid: { 
+                            color: 'rgba(61, 72, 85, 0.3)',
+                            drawBorder: false
+                        }
+                    }
+                },
+                elements: { 
+                    point: { 
+                        radius: 2, 
+                        hoverRadius: 4,
+                        backgroundColor: 'rgba(255,255,255,0.8)',
+                        borderWidth: 2
+                    }, 
+                    line: { 
+                        tension: 0.4, 
+                        borderWidth: 3,
+                        spanGaps: true // This will connect points even with null values
+                    } 
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            };
+
+            // Create CWI Chart
+            cwiChart = new Chart(document.getElementById('cwiChart'), { 
+                type: 'line', 
+                data: { 
+                    labels: timeLabels, 
+                    datasets: [{ 
+                        label: 'CWI',
+                        data: cwiData, 
+                        borderColor: '#4285f4', 
+                        backgroundColor: 'rgba(66,133,244,0.1)', 
+                        fill: true,
+                        pointBackgroundColor: '#4285f4',
+                        pointBorderColor: '#ffffff'
+                    }] 
+                }, 
+                options: baseOptions
+            });
+            
+            // Create Stress Chart
+            stressChart = new Chart(document.getElementById('stressChart'), { 
+                type: 'line', 
+                data: { 
+                    labels: timeLabels, 
+                    datasets: [{ 
+                        label: 'Stress',
+                        data: stressData, 
+                        borderColor: '#ff9800', 
+                        backgroundColor: 'rgba(255,152,0,0.1)', 
+                        fill: true,
+                        pointBackgroundColor: '#ff9800',
+                        pointBorderColor: '#ffffff'
+                    }] 
+                }, 
+                options: baseOptions
+            });
+            
+            // Create Fatigue Chart
+            fatigueChart = new Chart(document.getElementById('fatigueChart'), { 
+                type: 'line', 
+                data: { 
+                    labels: timeLabels, 
+                    datasets: [{ 
+                        label: 'Fatigue',
+                        data: fatigueData, 
+                        borderColor: '#ea4335', 
+                        backgroundColor: 'rgba(234,67,53,0.1)', 
+                        fill: true,
+                        pointBackgroundColor: '#ea4335',
+                        pointBorderColor: '#ffffff'
+                    }] 
+                }, 
+                options: baseOptions
+            });
+        }
+
+        function updateChartData() {
+            if (!lastDataUpdate) return;
+            
+            console.log('Updating charts with data:', lastDataUpdate); // Debug log
+            
+            const timeStr = new Date().toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+
+            // Shift arrays and add new data
+            timeLabels.shift(); 
+            timeLabels.push(timeStr);
+            
+            // Ensure we have valid numbers, default to 0 if null/undefined
+            const cwiValue = lastDataUpdate.cognitive_wellness_index !== undefined ? 
+                            lastDataUpdate.cognitive_wellness_index : 0;
+            const stressValue = lastDataUpdate.stress_level !== undefined ? 
+                              lastDataUpdate.stress_level : 0;
+            const fatigueValue = lastDataUpdate.fatigue_level !== undefined ? 
+                               lastDataUpdate.fatigue_level : 0;
+            
+            cwiData.shift(); 
+            cwiData.push(cwiValue);
+            
+            stressData.shift(); 
+            stressData.push(stressValue);
+            
+            fatigueData.shift(); 
+            fatigueData.push(fatigueValue);
+            
+            console.log('Chart data updated - CWI:', cwiValue, 'Stress:', stressValue, 'Fatigue:', fatigueValue);
+            
+            // Update charts
+            try {
+                if (cwiChart) cwiChart.update('none');
+                if (stressChart) stressChart.update('none');
+                if (fatigueChart) fatigueChart.update('none');
+            } catch (error) {
+                console.error('Error updating charts:', error);
+            }
+        }
+
+        // --- Utility Functions ---
+        function startTimers() {
+            // Mission Elapsed Time
+            setInterval(() => {
+                const elapsed = new Date(Date.now() - missionStartTime);
+                const met = {
+                    days: Math.floor(elapsed / (1000 * 60 * 60 * 24)),
+                    hours: elapsed.getUTCHours(),
+                    minutes: elapsed.getUTCMinutes(),
+                    seconds: elapsed.getUTCSeconds()
+                };
+                const metStr = `DAY ${String(met.days).padStart(2, '0')}:${String(met.hours).padStart(2, '0')}:${String(met.minutes).padStart(2, '0')}:${String(met.seconds).padStart(2, '0')}`;
+                document.getElementById('met-display').textContent = metStr;
+            }, 1000);
+
+            // Chart update loop - increased frequency for better real-time feel
+            setInterval(() => {
+                if (socket && socket.connected && lastDataUpdate) {
+                    updateChartData();
+                }
+            }, CHART_UPDATE_INTERVAL_MS);
+        }
+        
+        function updateConnectionStatus(connected, text) {
+            document.getElementById('status-indicator').classList.toggle('connected', connected);
+            document.getElementById('status-text').textContent = text;
+        }
+
+        function showConnectionOverlay(text) {
+            document.getElementById('connection-overlay').classList.remove('hidden');
+            document.getElementById('connection-status-text').textContent = text;
+        }
+
+        function hideConnectionOverlay() {
+            document.getElementById('connection-overlay').classList.add('hidden');
+        }
+
+        function logMessage(message, type = 'info') {
+            const logContainers = ['main-log', 'sidebar-log'];
+            const timestamp = new Date().toLocaleTimeString();
+            
+            logContainers.forEach(containerId => {
+                const logContainer = document.getElementById(containerId);
+                if (!logContainer) return;
+                
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${type}`;
+                entry.textContent = `[${timestamp}] ${message}`;
+                logContainer.insertBefore(entry, logContainer.firstChild);
+                
+                // Keep only recent entries
+                while (logContainer.children.length > MAX_LOG_ENTRIES) {
+                    logContainer.removeChild(logContainer.lastChild);
+                }
+            });
+        }
+        
+        function updateMetric(elementId, value, className = '') {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = value;
+                if (className) {
+                    element.className = `metric-value ${className}`;
+                }
+            }
+        }
+        
+        function getStatusClass(value) {
+            if (typeof value !== 'number') return 'low';
+            if (value >= 70) return 'high';
+            if (value >= 40) return 'moderate';
+            return 'low';
+        }
+
+        function getCWIColorClass(cwi) {
+            if (typeof cwi !== 'number') return 'cwi-critical';
+            if (cwi >= 80) return 'cwi-excellent';
+            if (cwi >= 60) return 'cwi-good';
+            if (cwi >= 40) return 'cwi-fair';
+            if (cwi >= 20) return 'cwi-poor';
+            return 'cwi-critical';
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => { 
+            if (socket) socket.disconnect(); 
+        });
+    </script>
+</body>
+</html>
