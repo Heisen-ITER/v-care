@@ -6,11 +6,9 @@ from collections import deque
 import threading
 import time
 
-# --- Basic Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Configuration ---
 SAMPLE_RATE = 22050
 ANALYSIS_DURATION_S = 1.5 
 ANALYSIS_SAMPLES = int(SAMPLE_RATE * ANALYSIS_DURATION_S)
@@ -19,7 +17,6 @@ N_MFCC = 13
 SILENCE_THRESHOLD = 0.005
 ANOMALY_SMOOTHING_WINDOW = 3
 
-# --- Global State ---
 audio_buffer = deque(maxlen=BUFFER_SAMPLES)
 audio_capture_thread = None
 is_capturing = False
@@ -58,7 +55,7 @@ def stop_audio_capture():
         if audio_capture_thread: audio_capture_thread.join(timeout=2)
         logger.info("VANI audio capture stopped.")
 
-def calibrate(duration=10):
+def calibrate(duration=12):
     global baseline_mfcc_mean, baseline_mfcc_std, is_calibrated
     if not is_capturing:
         start_audio_capture()
@@ -124,10 +121,6 @@ def analyze_audio():
         
         z_scores = (current_mfcc_mean - baseline_mfcc_mean) / (baseline_mfcc_std + 1e-6)
         anomaly_score = np.mean(np.abs(z_scores))
-        
-        # --- TUNED: Reverted to a less aggressive linear scoring model ---
-        # This provides a better balance between sensitivity and stability.
-        # An average deviation of 4 standard deviations is now considered a high anomaly.
         normalized_anomaly_score = min(1.0, anomaly_score / 4.0)
         raw_anomaly_score = normalized_anomaly_score
     
@@ -136,7 +129,6 @@ def analyze_audio():
         
     return output
 
-# Test block
 if __name__ == '__main__':
     start_audio_capture()
     try:
