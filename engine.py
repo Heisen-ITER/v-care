@@ -3,9 +3,8 @@ from collections import deque
 import numpy as np
 import time
 
-# --- Configuration ---
-BLINK_RATE_BASELINE = 18
-BLINK_RATE_FATIGUE = 35
+BLINK_RATE_BASELINE = 20
+BLINK_RATE_FATIGUE = 30
 BLINK_RATE_HIGH_FATIGUE = 45
 
 EMOTION_STRESS_MAP = {
